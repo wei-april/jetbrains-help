@@ -2,11 +2,12 @@ package com.april.jetbrain.utils;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.text.CharSequenceUtil;
+import cn.hutool.core.util.ObjectUtil;
 import lombok.experimental.UtilityClass;
+import org.springframework.boot.system.ApplicationHome;
 import org.springframework.core.io.ClassPathResource;
 
 import java.io.File;
-import java.io.IOException;
 
 /**
  * @author april
@@ -16,25 +17,35 @@ import java.io.IOException;
 @UtilityClass
 public class FileUtils {
 
-    public static boolean fileExists(String pathOrFile) {
-        return FileUtil.file(new ClassPathResource(pathOrFile).getPath()).exists();
+    ApplicationHome application = new ApplicationHome();
+
+
+    public static boolean fileExists(String path) {
+        return getFile(path).exists();
     }
 
-    public static File getFileOrCreat(String pathOrFile) {
-        File file = FileUtil.file(new ClassPathResource(pathOrFile).getPath());
-        if (!file.exists()) {
-            try {
-                File parentFile = file.getParentFile();
-                if (!parentFile.exists() && !parentFile.mkdir()) {
-                    throw new IllegalArgumentException(CharSequenceUtil.format("{} File directory create Failed", pathOrFile));
+    public static File getFile(String path) {
+        File homeDir = application.getDir();
+        File source = application.getSource();
+        ClassPathResource classPathResource = new ClassPathResource(path);
+        return ObjectUtil.isNull(source) ? FileUtil.file(classPathResource.getPath()) : FileUtil.file(homeDir, path);
+    }
+
+    public static File getFileOrCreat(String path) {
+        File file = getFile(path);
+        if (ObjectUtil.isNotNull(application.getSource())) {
+            ClassPathResource classPathResource = new ClassPathResource(path);
+            File classPathFile = FileUtil.file(classPathResource.getPath());
+            if (classPathResource.exists() && !file.exists()) {
+                try {
+                    FileUtil.writeFromStream(classPathResource.getInputStream(), classPathFile);
+                } catch (Exception e) {
+                    throw new IllegalArgumentException(CharSequenceUtil.format("{} File read failed", classPathFile.getPath()), e);
                 }
-                if (!file.createNewFile()) {
-                    throw new IllegalArgumentException(CharSequenceUtil.format("{} File create failed", pathOrFile));
-                }
-            } catch (IOException e) {
-                throw new IllegalArgumentException(CharSequenceUtil.format("{} File create failed", pathOrFile), e);
+                FileUtil.copy(classPathFile, file, true);
             }
         }
         return file;
+
     }
 }

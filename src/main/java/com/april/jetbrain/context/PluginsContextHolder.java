@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -33,7 +34,7 @@ public class PluginsContextHolder {
 
     private static final String PLUGIN_INFO_URL = PLUGIN_BASIC_URL + "/api/plugins/";
 
-    private static final String PLUGIN_JSON_FILE_NAME = "plugin.json";
+    private static final String PLUGIN_JSON_FILE_NAME = "external/data/plugin.json";
 
     private static List<PluginCache> pluginCacheList;
 
@@ -89,11 +90,14 @@ public class PluginsContextHolder {
     public static PluginList pluginList() {
         return HttpUtil.createGet(PLUGIN_LIST_URL)
                 .thenFunction(response -> {
-                    InputStream is = response.bodyStream();
-                    if (!response.isOk()) {
-                        throw new IllegalArgumentException(CharSequenceUtil.format("{} The request failed = {}", PLUGIN_LIST_URL, response));
+                    try (InputStream is = response.bodyStream()) {
+                        if (!response.isOk()) {
+                            throw new IllegalArgumentException(CharSequenceUtil.format("{} The request failed = {}", PLUGIN_LIST_URL, response));
+                        }
+                        return IoUtil.readObj(is, PluginList.class);
+                    } catch (IOException e) {
+                        throw new IllegalArgumentException(CharSequenceUtil.format("{} The request io read failed", PLUGIN_LIST_URL), e);
                     }
-                    return IoUtil.readObj(is, PluginList.class);
                 });
     }
 
@@ -124,11 +128,14 @@ public class PluginsContextHolder {
     public static PluginInfo pluginInfo(Long pluginId) {
         return HttpUtil.createGet(PLUGIN_INFO_URL + pluginId)
                 .thenFunction(response -> {
-                    InputStream is = response.bodyStream();
-                    if (!response.isOk()) {
-                        throw new IllegalArgumentException(CharSequenceUtil.format("{} The request failed = {}", PLUGIN_INFO_URL, response));
+                    try (InputStream is = response.bodyStream()) {
+                        if (!response.isOk()) {
+                            throw new IllegalArgumentException(CharSequenceUtil.format("{} The request failed = {}", PLUGIN_INFO_URL, response));
+                        }
+                        return IoUtil.readObj(is, PluginInfo.class);
+                    } catch (IOException e) {
+                        throw new IllegalArgumentException(CharSequenceUtil.format("{} The request io read failed", PLUGIN_LIST_URL), e);
                     }
-                    return IoUtil.readObj(is, PluginInfo.class);
                 });
     }
 
@@ -144,12 +151,8 @@ public class PluginsContextHolder {
 
         @Override
         public final boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (!(o instanceof PluginCache that)) {
-                return false;
-            }
+            if (this == o) return true;
+            if (!(o instanceof PluginCache that)) return false;
 
             return id.equals(that.id);
         }

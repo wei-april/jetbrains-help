@@ -28,22 +28,31 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class AgentContextHolder {
-    private static final String JA_NETFILTER_FILE_PATH = "static/agent/ja-netfilter";
+    private static final String JA_NETFILTER_FILE_PATH = "external/agent/ja-netfilter";
 
     private static final String POWER_CONF_FILE_NAME = JA_NETFILTER_FILE_PATH + "/config/power.conf";
 
     private static File jaNetfilterFile;
 
+    private static File jaNetfilterZipFile;
+
     public static void init() {
         log.info("Agent context init loading...");
-        jaNetfilterFile = FileUtils.getFileOrCreat(JA_NETFILTER_FILE_PATH);
-        if (!powerConfHasInit()) {
-            log.info("Agent config init loading...");
-            loadPowerConf();
-            zipJaNetfilter();
-            log.info("Agent config init success !");
+        jaNetfilterZipFile = FileUtils.getFileOrCreat(JA_NETFILTER_FILE_PATH + ".zip");
+        if (!FileUtils.fileExists(JA_NETFILTER_FILE_PATH)) {
+            unzipJaNetfilter();
+            if (!powerConfHasInit()) {
+                log.info("Agent config init loading...");
+                loadPowerConf();
+                zipJaNetfilter();
+                log.info("Agent config init success !");
+            }
         }
         log.info("Agent context init success !");
+    }
+
+    public static File jaNetfilterZipFile() {
+        return AgentContextHolder.jaNetfilterZipFile;
     }
 
     private static boolean powerConfHasInit() {
@@ -68,7 +77,7 @@ public class AgentContextHolder {
                 }).join();
     }
 
-    @SneakyThrows(value = Exception.class)
+    @SneakyThrows
     private static String generatePowerConfigRule() {
         X509Certificate crt = (X509Certificate) KeyUtil.readX509Certificate(IoUtil.toStream(CertificateContextHolder.crtFile()));
         RSAPublicKey publicKey = (RSAPublicKey) PemUtil.readPemPublicKey(IoUtil.toStream(CertificateContextHolder.publicKeyFile()));
@@ -93,7 +102,11 @@ public class AgentContextHolder {
         }
     }
 
+    private static void unzipJaNetfilter() {
+        jaNetfilterFile = ZipUtil.unzip(jaNetfilterZipFile);
+    }
+
     private static void zipJaNetfilter() {
-        ZipUtil.zip(jaNetfilterFile);
+        jaNetfilterZipFile = ZipUtil.zip(jaNetfilterFile);
     }
 }
